@@ -1,2 +1,8 @@
 streamlit
 openai
+langchain==0.0.342
+streamlit-webrtc
+google-generativeai==0.3.2
+pydub
+pillow
+python-dotenv
