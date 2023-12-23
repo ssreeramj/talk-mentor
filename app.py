@@ -58,7 +58,9 @@ if __name__ == "__main__":
     webrtc_ctx = webrtc_streamer(
         key="audio-video-sendonly",
         mode=WebRtcMode.SENDONLY,
-        # rtc_configuration={"iceServers": get_ice_servers()},
+        rtc_configuration={  # Add this config
+        "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+        },
         media_stream_constraints={"video": True, "audio": True},
     )
 
