@@ -1,6 +1,8 @@
+import cv2
+import os
 import re
 import traceback
-
+import math
 import google.generativeai as genai
 import PIL
 import streamlit as st
@@ -9,8 +11,64 @@ text_model = genai.GenerativeModel("gemini-pro")
 vision_model = genai.GenerativeModel("gemini-pro-vision")
 
 
+def process_video():
+
+    # print(len(final_frames))
+    output_directory = "output_images"
+    image_size = (100, 100)  # Adjust the size of each frame as needed
+    rows, columns = 5, 5
+    images_per_output = rows * columns
+    
+    # get the video frames to analyze
+    # Create a PIL Image object from the NumPy array
+    frames = st.session_state["raw_video_frames"]
+    final_frames = []
+    skip_frames = math.ceil(st.session_state["num_frames"] / (images_per_output * 16)) 
+    for i in range(len(frames[::skip_frames])):
+        pil_image = PIL.Image.fromarray(frames[i])
+        final_frames.append(pil_image) 
+    
+    total_images = min(math.ceil(len(final_frames) / images_per_output), 16)
+
+    # Create the output directory if it doesn't exist
+    os.makedirs(output_directory, exist_ok=True)
+
+    new_images = []
+    # Iterate through each set of frames for creating images
+    frame_number = 0
+    for i in range(total_images):
+        # Create a new image
+        new_image = PIL.Image.new("RGB", (image_size[0] * columns, image_size[1] * rows))
+
+        # Load frames into the image
+        while frame_number < images_per_output:
+            # Open and resize the frame
+            frame = final_frames[frame_number]
+            frame = frame.resize(image_size)
+
+            # Calculate the position to paste the frame
+            row_position = (frame_number // columns) * image_size[1]
+            col_position = (frame_number % columns) * image_size[0]
+
+            # Paste the frame onto the new image
+            new_image.paste(frame, (col_position, row_position))
+            frame_number += 1
+
+        frame_number = 0
+        # Save the combined image
+        output_path = os.path.join(output_directory, f"output_image_{i + 1}.png")
+        new_image.save(output_path)
+        new_images.append(new_image)
+
+    print("Images created successfully.")
+    return new_images
+
+
 def generate_video_feedback():
     try:
+        user_images = process_video()
+        st.write(user_images)
+
         img_prompt = """Context: The assistant receives a tiled series of screenshots from a user's live video feed. These screenshots represent sequential frames from the video, capturing distinct moments. The assistant is to analyze these frames as a continuous video feed.
 
         1. Address the user directly, and assume that what is shown in the images is what the user is doing.
@@ -21,12 +79,12 @@ def generate_video_feedback():
         6. Tell them what they did right while speaking, and then give them feedback as to what could be improved. 
         7. Finally conclude your feedback.
         """
-        pil_image = PIL.Image.fromarray(st.session_state["raw_video_frames"][0])
-        st.image(pil_image)
-        # response = vision_model.generate_content(contents=[img_prompt, pil_image])
-        # response.resolve()
-        video_feedback = "Sample Video Feedback"
-        # video_feedback = response.text.strip()
+        # user_images = PIL.Image.fromarray(st.session_state["raw_video_frames"][0])
+        # st.image(user_images)
+        response = vision_model.generate_content(contents=[img_prompt, *user_images])
+        response.resolve()
+        video_feedback = response.text.strip()
+        # video_feedback = "Sample Video Feedback"
     except:
         print(f"Excption in generating video feedback: {traceback.format_exc()}")
         video_feedback = "Error in generating video feedback!"
@@ -135,14 +193,15 @@ def generate_text_feedback(speech_text, topic):
     function to give feedback on the speech text.
     """
     st.subheader("Speech Feedback")
-    grammarian_feedback = get_grammarian_feedback(
-        speech_text=speech_text,
-        topic=topic,
-    )
-    st.write(grammarian_feedback)
+    st.write("Sample Speech Feedback")
+    # grammarian_feedback = get_grammarian_feedback(
+    #     speech_text=speech_text,
+    #     topic=topic,
+    # )
+    # st.write(grammarian_feedback)
 
-    ah_counter_feedback = get_ah_counter_feedback(speech_text=speech_text)
-    st.write(ah_counter_feedback)
+    # ah_counter_feedback = get_ah_counter_feedback(speech_text=speech_text)
+    # st.write(ah_counter_feedback)
 
     overall_evaluator_prompt = f"""Context: The assistant will receive 
 

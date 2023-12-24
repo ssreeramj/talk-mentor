@@ -122,6 +122,7 @@ if __name__ == "__main__":
             logger.warning("AudioReciver is not set. Abort.")
             break
 
+    st.session_state["num_frames"] = len(st.session_state["raw_video_frames"])
     st.write(st.session_state)
 
     # Handling of the video frames and audio buffer
