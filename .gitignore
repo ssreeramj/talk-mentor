@@ -1,3 +1,5 @@
 ttt-env
 .streamlit
 .env
+__pycache__
+notebooks
