@@ -82,8 +82,8 @@ if __name__ == "__main__":
                     "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
                 },
                 media_stream_constraints={"video": True, "audio": True},
-                audio_receiver_size=256,
-                video_receiver_size=256,
+                audio_receiver_size=512,
+                video_receiver_size=512,
             )
 
             image_place = st.empty()
