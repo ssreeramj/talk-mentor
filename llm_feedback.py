@@ -1,8 +1,9 @@
-import cv2
+import math
 import os
 import re
 import traceback
-import math
+
+import cv2
 import google.generativeai as genai
 import PIL
 import streamlit as st
@@ -11,53 +12,84 @@ text_model = genai.GenerativeModel("gemini-pro")
 vision_model = genai.GenerativeModel("gemini-pro-vision")
 
 
-def process_video():
+def get_speech_topic():
+    try:
+        topic_prompt = f"""Context: The assistant receives some themes and it has to return a topic related to one of the themes for the user to speak.
+        Eg: if the theme is "Holiday" then the topic could be, "Talk about your last vacation"
+        If the theme is "Cricket", then the topic could be, "What's your unforgettable cricket moment".
 
+        Just give the topic, nothing else
+
+        Themes: {st.session_state['theme-input']}
+        """
+        response = text_model.generate_content(topic_prompt)
+        speech_topic = response.text.strip()
+    except Exception as e:
+        speech_topic = "Tell me about yourself"
+        print(f"Error in generating topic: {traceback.format_exc()}")
+
+    st.session_state["speech-topic"] = speech_topic
+
+
+def process_video():
     # print(len(final_frames))
-    output_directory = "output_images"
+    # output_directory = "output_images"
     image_size = (100, 100)  # Adjust the size of each frame as needed
     rows, columns = 5, 5
     images_per_output = rows * columns
-    
+
     # get the video frames to analyze
     # Create a PIL Image object from the NumPy array
     frames = st.session_state["raw_video_frames"]
     final_frames = []
-    skip_frames = math.ceil(st.session_state["num_frames"] / (images_per_output * 16)) 
+    skip_frames = math.ceil(st.session_state["num_frames"] / (images_per_output * 16))
+    # st.write(f"{skip_frames=}")
     for i in range(len(frames[::skip_frames])):
         pil_image = PIL.Image.fromarray(frames[i])
-        final_frames.append(pil_image) 
-    
+        final_frames.append(pil_image)
+
+    # st.write(f"{len(final_frames)=}")
     total_images = min(math.ceil(len(final_frames) / images_per_output), 16)
+    # st.write(f"{total_images=}")
 
     # Create the output directory if it doesn't exist
-    os.makedirs(output_directory, exist_ok=True)
+    # os.makedirs(output_directory, exist_ok=True)
 
     new_images = []
     # Iterate through each set of frames for creating images
     frame_number = 0
     for i in range(total_images):
         # Create a new image
-        new_image = PIL.Image.new("RGB", (image_size[0] * columns, image_size[1] * rows))
+        new_image = PIL.Image.new(
+            "RGB", (image_size[0] * columns, image_size[1] * rows)
+        )
 
         # Load frames into the image
-        while frame_number < images_per_output:
+        for j in range(images_per_output):
+            if frame_number == len(final_frames):
+                break
             # Open and resize the frame
+            # print(frame_number)
             frame = final_frames[frame_number]
             frame = frame.resize(image_size)
+            # st.image(frame)
 
             # Calculate the position to paste the frame
-            row_position = (frame_number // columns) * image_size[1]
+            row_position = (
+                (frame_number - (i * images_per_output)) // columns
+            ) * image_size[1]
             col_position = (frame_number % columns) * image_size[0]
+
+            # print(f"{row_position=}, {col_position=}")
 
             # Paste the frame onto the new image
             new_image.paste(frame, (col_position, row_position))
             frame_number += 1
 
-        frame_number = 0
         # Save the combined image
-        output_path = os.path.join(output_directory, f"output_image_{i + 1}.png")
-        new_image.save(output_path)
+        # output_path = os.path.join(output_directory, f"output_image_{i + 1}.png")
+        # new_image.save(output_path)
+        # st.image(new_image)
         new_images.append(new_image)
 
     print("Images created successfully.")
@@ -67,7 +99,6 @@ def process_video():
 def generate_video_feedback():
     try:
         user_images = process_video()
-        st.write(user_images)
 
         img_prompt = """Context: The assistant receives a tiled series of screenshots from a user's live video feed. These screenshots represent sequential frames from the video, capturing distinct moments. The assistant is to analyze these frames as a continuous video feed.
 
@@ -79,8 +110,6 @@ def generate_video_feedback():
         6. Tell them what they did right while speaking, and then give them feedback as to what could be improved. 
         7. Finally conclude your feedback.
         """
-        # user_images = PIL.Image.fromarray(st.session_state["raw_video_frames"][0])
-        # st.image(user_images)
         response = vision_model.generate_content(contents=[img_prompt, *user_images])
         response.resolve()
         video_feedback = response.text.strip()
@@ -193,16 +222,13 @@ def generate_text_feedback(speech_text, topic):
     function to give feedback on the speech text.
     """
     st.subheader("Speech Feedback")
-    st.write("Sample Speech Feedback")
-    # grammarian_feedback = get_grammarian_feedback(
-    #     speech_text=speech_text,
-    #     topic=topic,
-    # )
-    # st.write(grammarian_feedback)
+    # st.write("Sample Speech Feedback")
+    ah_counter_feedback = get_ah_counter_feedback(speech_text=speech_text)
+    st.write(ah_counter_feedback)
+    
+    grammarian_feedback = get_grammarian_feedback(
+        speech_text=speech_text,
+        topic=topic,
+    )
+    st.write(grammarian_feedback)
 
-    # ah_counter_feedback = get_ah_counter_feedback(speech_text=speech_text)
-    # st.write(ah_counter_feedback)
-
-    overall_evaluator_prompt = f"""Context: The assistant will receive 
-
-    """
